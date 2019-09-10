@@ -6,7 +6,7 @@
   "scripts": {
     "clean": "rimraf dist",
     "start": "parcel index.html",
-    "build": "parcel build index.html",
+    "build": "parcel build index.html --public-url \"/naive-react-virtual-scroll-grid\"",
     "deploy": "npm run clean && npm run build && gh-pages -d dist",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
