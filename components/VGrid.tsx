@@ -1,9 +1,11 @@
 import React from "react";
+import { animateScroll } from "react-scroll";
 
 type Props<T> = {
   items: T[];
   renderItem: (props: { item: T }) => any;
   rowGap: number;
+  containerWidth: number;
   cellHeight: number;
 };
 
@@ -15,7 +17,7 @@ type State = {
   visibleItemsCount: number;
 };
 
-const firstRenderItemsCount = 3 * 4;
+let hashConsumed = false;
 
 export class VGrid<T extends { name: string; } = { name: string; }> extends React.Component<Props<T>, State> {
 
@@ -25,7 +27,7 @@ export class VGrid<T extends { name: string; } = { name: string; }> extends Reac
 
   state: State = {
     isIntersecting: false,
-    offset: firstRenderItemsCount,
+    offset: 0,
     cellCountPerColumn: 1,
     containerHeight: 0,
     visibleItemsCount: 20,
@@ -36,6 +38,15 @@ export class VGrid<T extends { name: string; } = { name: string; }> extends Reac
   constructor(props: Props<T>) {
     super(props);
     this.handleOnScroll = this.handleOnScroll.bind(this);
+    this.handleOnHashChange = this.handleOnHashChange.bind(this);
+  }
+
+  UNSAFE_componentWillReceiveProps(next: Props<T>) {
+    console.log(next.containerWidth);
+    const nextCountCellsInColumn = this.countCellsInColumn();
+    if (nextCountCellsInColumn !== this.state.cellCountPerColumn) {
+      this.updateContainerState();
+    }
   }
 
   componentDidMount() {
@@ -51,31 +62,16 @@ export class VGrid<T extends { name: string; } = { name: string; }> extends Reac
     });
     this.observer.observe(containerElement);
     document.addEventListener("scroll", this.handleOnScroll);
+    addEventListener("hashchange", this.handleOnHashChange);
 
     this.updateContainerState();
-
-    const rafCb = () => {
-      this.watchGridMarkerPosition();
-      requestAnimationFrame(rafCb);
-    };
-    rafCb();
   }
 
   componentWillUnmount() {
     document.removeEventListener("scroll", this.handleOnScroll);
+    window.removeEventListener("hashchange", this.handleOnHashChange);
     if (this.observer) {
       this.observer.disconnect();
-    }
-  }
-
-  private watchGridMarkerPosition() {
-    const fixUlElement = this.firstRenderUlRef.current;
-    if (!fixUlElement) return;
-    const markerElement = fixUlElement.lastElementChild as HTMLElement;
-    const currentMarkerOffsetTop = markerElement.offsetTop;
-    if (this.previousMarkerOffsetTop !== currentMarkerOffsetTop) {
-      this.previousMarkerOffsetTop = currentMarkerOffsetTop;
-      Promise.resolve().then(() => this.updateContainerState());
     }
   }
 
@@ -88,25 +84,43 @@ export class VGrid<T extends { name: string; } = { name: string; }> extends Reac
 
     this.setState({ containerHeight, cellCountPerColumn });
 
+    if (!hashConsumed) {
+      const hit = this.calculatePositionFromHash(location.hash);
+      if (hit) {
+        hashConsumed = true;
+        console.log(hit);
+        this.setState({ offset: hit.offset });
+        setTimeout(() => {
+          scrollTo(0, this.calculateScrollTop(hit.offset));
+        }, 10);
+        return;
+      }
+    }
+
     requestAnimationFrame(() => this.updateCurrentOffset());
   }
 
   private countCellsInColumn() {
-    const fixUlElement = this.firstRenderUlRef.current;
-    if (!fixUlElement) return 1;
-    this.previousMarkerOffsetTop = (fixUlElement.lastElementChild as HTMLLIElement).offsetTop;
-    const listItems = fixUlElement.querySelectorAll("li[data-item-number]") as NodeListOf<HTMLLIElement>;
-    let lastOffestTop: number = 0;
-    let count = 0;
-    for (let listItem of listItems) {
-      if (listItem.offsetTop !== lastOffestTop) {
-        break;
-      }
-      ++count;
-      lastOffestTop = listItem.offsetTop;
-    }
-    // console.log(count);
-    return count;
+    const { containerWidth, rowGap } = this.props;
+    // TODO
+    if (containerWidth >= 760) return ~~((containerWidth + rowGap) / (360 + rowGap));
+    return 1;
+  }
+
+  private calculatePositionFromHash(hash: string) {
+    const targetName = hash.slice(1);
+    const foundIndex = this.props.items.findIndex(({ name }) => name === targetName);
+    if (foundIndex === -1) return;
+    return {
+      offset: foundIndex,
+    };
+  }
+
+  private handleOnHashChange({ newURL }: HashChangeEvent) {
+    const { hash } = new URL(newURL)
+    const hit = this.calculatePositionFromHash(hash);
+    if (!hit) return;
+    animateScroll.scrollTo(this.calculateScrollTop(hit.offset));
   }
 
   private handleOnScroll() {
@@ -123,13 +137,9 @@ export class VGrid<T extends { name: string; } = { name: string; }> extends Reac
     const wsy = window.scrollY;
     const deltaY = wsy - cot;
     const nextOffset = ~~(deltaY / rowHeight) * this.state.cellCountPerColumn;
-    if (nextOffset >= firstRenderItemsCount && this.state.offset !== nextOffset) {
+    if (nextOffset >= 0 && this.state.offset !== nextOffset) {
       this.setState({ offset: nextOffset });
     }
-  }
-
-  private createFirstItems() {
-    return this.props.items.slice(0, firstRenderItemsCount);
   }
 
   private createVisibleItems() {
@@ -137,28 +147,24 @@ export class VGrid<T extends { name: string; } = { name: string; }> extends Reac
     return this.props.items.slice(offset, visibleItemsCount + offset);
   }
 
-  private calculateVScrollGridTop() {
+  private calculateVScrollGridTop(offsetIndex: number) {
     const { rowGap, cellHeight } = this.props;
     const rowHeight = cellHeight + rowGap;
-    const { offset, cellCountPerColumn } = this.state;
-    return ~~(offset  / cellCountPerColumn) * rowHeight;
+    const { cellCountPerColumn } = this.state;
+    return ~~(offsetIndex  / cellCountPerColumn) * rowHeight;
+  }
+
+  private calculateScrollTop(offsetIndex: number) {
+    if (!this.containerRef.current) return 0;
+    return this.calculateVScrollGridTop(offsetIndex) + this.containerRef.current.offsetTop;
   }
 
   render() {
     const { items, renderItem } = this.props;
     const { containerHeight } = this.state;
-    const top = this.calculateVScrollGridTop();
+    const top = this.calculateVScrollGridTop(this.state.offset);
     return (
       <div ref={this.containerRef} style={{ height: containerHeight, position: "relative" }}>
-        <ul style={{ position: "absolute", left: 0, right: 0, top: 0 }} ref={this.firstRenderUlRef} className="cellGrid">
-          {this.createFirstItems().map((item, i) => {
-            return (
-              <li data-item-number={i} key={item.name}>
-                {renderItem({ item })}
-              </li>
-            );
-          })}
-        </ul>
         <ul style={{ position: "absolute", left: 0, right: 0, top }} className="cellGrid">
           {this.createVisibleItems().map(item => {
             return (
