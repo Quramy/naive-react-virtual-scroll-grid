@@ -17,7 +17,7 @@ const data = {
   newItems: range(20).map(i => ({
     name: `new_${i}`,
   })),
-  passed: range(100).map(i => ({
+  passed: range(1000).map(i => ({
     name: `passed_${i}`,
   })),
 };
@@ -44,7 +44,7 @@ export const App = () => {
           <h1>Report detail</h1>
 
           <nav>
-            {data.passed.map(item => (
+            {data.passed.slice(0, 100).map(item => (
               <a key={item.name} href={`#${item.name}`}>{item.name} </a>
             ))}
           </nav>
