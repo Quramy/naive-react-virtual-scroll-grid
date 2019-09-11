@@ -1,6 +1,6 @@
-import React from "react";
-import { animateScroll } from "react-scroll";
-import { ResizeObserver } from "@juggle/resize-observer"
+import React from 'react';
+import { animateScroll } from 'react-scroll';
+import { ResizeObserver } from '@juggle/resize-observer'
 
 type Props<T> = {
   items: T[];
@@ -65,16 +65,16 @@ export class VGrid<T> extends React.Component<Props<T>, State> {
       this.previousContainerWidth = width;
     });
     this.resizeObserver.observe(containerElement);
-    document.addEventListener("scroll", this.handleOnScroll);
-    window.addEventListener("hashchange", this.handleOnHashChange);
+    document.addEventListener('scroll', this.handleOnScroll);
+    window.addEventListener('hashchange', this.handleOnHashChange);
 
     this.previousContainerWidth = containerElement.clientWidth;
     this.updateContainerState(containerElement.clientWidth);
   }
 
   componentWillUnmount() {
-    document.removeEventListener("scroll", this.handleOnScroll);
-    window.removeEventListener("hashchange", this.handleOnHashChange);
+    document.removeEventListener('scroll', this.handleOnScroll);
+    window.removeEventListener('hashchange', this.handleOnHashChange);
     this.intersectionObserver && this.intersectionObserver.disconnect();
     this.resizeObserver && this.resizeObserver.disconnect();
   }
@@ -169,8 +169,8 @@ export class VGrid<T> extends React.Component<Props<T>, State> {
     const { containerHeight } = this.state;
     const top = this.calculateVScrollGridTop(this.state.offset);
     return (
-      <div ref={this.containerRef} style={{ height: containerHeight, position: "relative" }}>
-        <ul style={{ position: "absolute", left: 0, right: 0, top }} className="cellGrid">
+      <div ref={this.containerRef} style={{ height: containerHeight, position: 'relative' }}>
+        <ul style={{ position: 'absolute', left: 0, right: 0, top }} className='cellGrid'>
           {this.createVisibleItems().map(item => {
             return (
               <li key={keyFn(item)}>
