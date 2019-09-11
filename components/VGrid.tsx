@@ -1,51 +1,114 @@
 import React from 'react';
 import { animateScroll } from 'react-scroll';
 import { ResizeObserver } from '@juggle/resize-observer'
+import { InitialHashContext, InitialHashContextValue } from './InitialHashContext';
+
+type GridStyleProperty = {
+  gridGap: number;
+  minContentLength?: number;
+};
+
+type GridStyle = {
+  gridGap: number;
+  gridTemplateColumns: string;
+  display: 'grid';
+  position: 'absolute';
+  left: 0;
+  right: 0;
+};
 
 type Props<T> = {
   items: T[];
   keyFn: (item: T) => string;
-  renderItem: (props: { item: T }) => any;
-  rowGap: number;
+  children: (props: { item: T }) => JSX.Element;
+  gridOptions: GridStyleProperty | ({ media: string } & GridStyleProperty)[],
   cellHeight: number;
 };
 
 type State = {
   isIntersecting: boolean;
-  offset: number;
   containerHeight: number;
-  cellCountPerColumn: number;
-  visibleItemsCount: number;
+  repeatLength: number;
+  gridStyle: GridStyle;
+  offsetIndex: number; // The first index of the cell displayed in viewport
+  visibleItemsLength: number; // The number of cells to render
 };
 
-let hashConsumed = false;
+const createGridStyleObject = (opt: GridStyleProperty) => {
+  return {
+    display: 'grid',
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    gridGap: opt.gridGap,
+    gridTemplateColumns: opt.minContentLength ?  `repeat(auto-fill, minmax(${opt.minContentLength}px, 1fr))` : 'repeat(1, 1fr)',
+  } as const;
+};
+
+const prerenderRowsLength = 1;
 
 export class VGrid<T> extends React.Component<Props<T>, State> {
 
+  static contextType = InitialHashContext;
+
+  context!: InitialHashContextValue;
   containerRef = React.createRef<HTMLDivElement>();
-  firstRenderUlRef = React.createRef<HTMLUListElement>();
+  intersectionObserver?: IntersectionObserver;
+  resizeObserver?: ResizeObserver;
+  gridProperties: { media: MediaQueryList, prop: GridStyleProperty }[];
+  previousContainerWidth?: number;
 
   state: State = {
     isIntersecting: false,
-    offset: 0,
-    cellCountPerColumn: 1,
+    offsetIndex: 0,
+    repeatLength: 1,
+    gridStyle: {
+      display: 'grid',
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      gridGap: -1,
+      gridTemplateColumns: '',
+    },
     containerHeight: 0,
-    visibleItemsCount: 20,
+    visibleItemsLength: 20,
   };
 
-  intersectionObserver?: IntersectionObserver;
-  resizeObserver?: ResizeObserver;
-  previousContainerWidth?: number;
-
   constructor(props: Props<T>) {
+
     super(props);
+
     this.handleOnScroll = this.handleOnScroll.bind(this);
     this.handleOnHashChange = this.handleOnHashChange.bind(this);
+
+    // Create pseudo CSS obj to emulate the media query such as:
+    //
+    // ```css
+    // @media screen and (min-width: 320px) {
+    //   ...
+    // }
+    // ```
+    // The created pair MediaQueryList instance will be used to determine grid style properties
+    //
+    if (!Array.isArray(props.gridOptions)) {
+      this.gridProperties = [{
+        media: matchMedia('all'),
+        prop: props.gridOptions,
+      }];
+    } else {
+      this.gridProperties = props.gridOptions.slice().reverse().map(({ media, ...rest }) => ({
+        media: matchMedia(media),
+        prop: rest,
+      }));
+    }
+
   }
 
   componentDidMount() {
     const containerElement = this.containerRef.current;
     if (!containerElement) return;
+
+    // Using IntersectionObserver to prevent scrolling calculation when the entire container is out of viewport.
     this.intersectionObserver = new IntersectionObserver(entries => {
       if (entries.length !== 1) return;
       const entry = entries[0];
@@ -55,6 +118,8 @@ export class VGrid<T> extends React.Component<Props<T>, State> {
       threshold: 0,
     });
     this.intersectionObserver.observe(containerElement);
+
+    // Using ResizeObserver because we should update some grid properties(e.g. the num of cells per 1 row) when the container element is resized.
     this.resizeObserver = new ResizeObserver(entries => {
       if (entries.length !== 1) return;
       const entry = entries[0];
@@ -65,10 +130,15 @@ export class VGrid<T> extends React.Component<Props<T>, State> {
       this.previousContainerWidth = width;
     });
     this.resizeObserver.observe(containerElement);
+
     document.addEventListener('scroll', this.handleOnScroll);
+
+    // Listen to URL hash and update scrolling position if it's changed.
     window.addEventListener('hashchange', this.handleOnHashChange);
 
     this.previousContainerWidth = containerElement.clientWidth;
+
+    // Initialize grid information
     this.updateContainerState(containerElement.clientWidth);
   }
 
@@ -79,36 +149,42 @@ export class VGrid<T> extends React.Component<Props<T>, State> {
     this.resizeObserver && this.resizeObserver.disconnect();
   }
 
+  // This function should be invoked when the container element is resized.
   private updateContainerState(containerWidth: number) {
-    const { rowGap, cellHeight } = this.props;
-    const rowHeight = cellHeight + rowGap;
+    const { cellHeight } = this.props;
+    const { gridStyle, repeatLength } = this.getGridDefinition(containerWidth);
+    const rowHeight = cellHeight + gridStyle.gridGap;
     const allItemsCount = this.props.items.length;
-    const cellCountPerColumn = this.countCellsInColumn(containerWidth);
-    const containerHeight = Math.ceil(allItemsCount / cellCountPerColumn) * rowHeight - rowGap;
+    const containerHeight = Math.ceil(allItemsCount / repeatLength) * rowHeight - gridStyle.gridGap;
+    const visibleItemsLength = (~~(document.scrollingElement!.clientHeight / (this.props.cellHeight + gridStyle.gridGap)) + 2 + prerenderRowsLength) * repeatLength;
+    this.setState({ containerHeight, repeatLength, visibleItemsLength, gridStyle });
 
-    this.setState({ containerHeight, cellCountPerColumn });
-
-    if (!hashConsumed) {
-      const hit = this.calculatePositionFromHash(location.hash);
+    // For direct landing using URL with hash
+    if (!this.context.consumed) {
+      const hit = this.calculatePositionFromHash(this.context.hash);
       if (hit) {
-        hashConsumed = true;
-        console.log(hit);
-        this.setState({ offset: hit.offset });
-        setTimeout(() => {
-          scrollTo(0, this.calculateScrollTop(hit.offset));
-        }, 10);
+        // Notify scrolling to the context because we should not check the hash after the scrolling.
+        this.context.consume();
+        this.setState({ offsetIndex: hit.offsetIndex });
+        setTimeout(() => scrollTo(0, this.calculateClientOffsetTop(hit.offsetIndex)));
         return;
       }
     }
 
-    requestAnimationFrame(() => this.updateCurrentOffset());
+    requestAnimationFrame(() => this.updateCurrentOffsetIndex());
   }
 
-  private countCellsInColumn(containerWidth: number) {
-    const { rowGap } = this.props;
-    // TODO
-    if (containerWidth >= 760) return ~~((containerWidth + rowGap) / (360 + rowGap));
-    return 1;
+  private getGridDefinition(containerWidth: number) {
+    let matched: GridStyleProperty | undefined;
+    this.gridProperties.some(({ media, prop }) => {
+      matched = prop;
+      return media.matches;
+    });
+    if (!matched) throw new Error('No matched media');
+    const { gridGap, minContentLength } = matched;
+    const repeatLength = minContentLength ? ~~((containerWidth + gridGap) / (minContentLength + gridGap)) : 1;
+    const gridStyle = createGridStyleObject(matched);
+    return { gridStyle, repeatLength, gridGap };
   }
 
   private calculatePositionFromHash(hash: string) {
@@ -117,7 +193,7 @@ export class VGrid<T> extends React.Component<Props<T>, State> {
     const foundIndex = this.props.items.findIndex(item => keyFn(item) === targetName);
     if (foundIndex === -1) return;
     return {
-      offset: foundIndex,
+      offsetIndex: foundIndex,
     };
   }
 
@@ -125,59 +201,67 @@ export class VGrid<T> extends React.Component<Props<T>, State> {
     const { hash } = new URL(newURL)
     const hit = this.calculatePositionFromHash(hash);
     if (!hit) return;
-    animateScroll.scrollTo(this.calculateScrollTop(hit.offset));
+    animateScroll.scrollTo(this.calculateClientOffsetTop(hit.offsetIndex));
   }
 
   private handleOnScroll() {
     if (!this.state.isIntersecting) return;
-    this.updateCurrentOffset();
+    this.updateCurrentOffsetIndex();
   };
 
-  private updateCurrentOffset() {
-    const { rowGap, cellHeight } = this.props;
-    const rowHeight = cellHeight + rowGap;
+  private updateCurrentOffsetIndex() {
     const containerElement = this.containerRef.current;
     if (!containerElement) return;
     const cot = containerElement.offsetTop;
-    const wsy = window.scrollY;
-    const deltaY = wsy - cot;
-    const nextOffset = ~~(deltaY / rowHeight) * this.state.cellCountPerColumn;
-    if (nextOffset >= 0 && this.state.offset !== nextOffset) {
-      this.setState({ offset: nextOffset });
+    const sst = document.scrollingElement!.scrollTop;
+    const deltaY = sst - cot;
+    const nextOffsetIndex = ~~(deltaY / this.rowHeightUnit) * this.state.repeatLength;
+    if (nextOffsetIndex >= 0 && this.state.offsetIndex !== nextOffsetIndex) {
+      this.setState({ offsetIndex: nextOffsetIndex });
     }
   }
 
-  private createVisibleItems() {
-    const { offset, visibleItemsCount } = this.state;
-    return this.props.items.slice(offset, visibleItemsCount + offset);
+  private sliceVisibleItems() {
+    const { offsetIndex, visibleItemsLength } = this.state;
+    return this.props.items.slice(offsetIndex, visibleItemsLength + offsetIndex);
   }
 
-  private calculateVScrollGridTop(offsetIndex: number) {
-    const { rowGap, cellHeight } = this.props;
-    const rowHeight = cellHeight + rowGap;
-    const { cellCountPerColumn } = this.state;
-    return ~~(offsetIndex  / cellCountPerColumn) * rowHeight;
+  private get rowHeightUnit() {
+    const { cellHeight } = this.props;
+    const { gridStyle: { gridGap } } = this.state;
+    return cellHeight + gridGap;
   }
 
-  private calculateScrollTop(offsetIndex: number) {
+  private calculateInnerOffsetTop(offsetIndex: number) {
+    const { repeatLength } = this.state;
+    return ~~(offsetIndex  / repeatLength) * this.rowHeightUnit;
+  }
+
+  private calculateClientOffsetTop(offsetIndex: number) {
     if (!this.containerRef.current) return 0;
-    return this.calculateVScrollGridTop(offsetIndex) + this.containerRef.current.offsetTop;
+    return this.calculateInnerOffsetTop(offsetIndex) + this.containerRef.current.offsetTop;
   }
 
   render() {
-    const { renderItem, keyFn } = this.props;
+    const { children, keyFn, cellHeight } = this.props;
     const { containerHeight } = this.state;
-    const top = this.calculateVScrollGridTop(this.state.offset);
+    const offsetTop = this.calculateInnerOffsetTop(this.state.offsetIndex);
+    const containerStyle = {
+      position: 'relative',
+      height: containerHeight,
+    } as const;
+    const innerStyle = {
+      ...this.state.gridStyle,
+      top: offsetTop,
+    };
     return (
-      <div ref={this.containerRef} style={{ height: containerHeight, position: 'relative' }}>
-        <ul style={{ position: 'absolute', left: 0, right: 0, top }} className='cellGrid'>
-          {this.createVisibleItems().map(item => {
-            return (
-              <li key={keyFn(item)}>
-                {renderItem({ item })}
-              </li>
-            );
-          })}
+      <div ref={this.containerRef} style={containerStyle}>
+        <ul style={innerStyle}>
+          {this.sliceVisibleItems().map(item => (
+            <li key={keyFn(item)} style={{ height: cellHeight }}>
+              {children({ item })}
+            </li>
+          ))}
         </ul>
       </div>
     );

@@ -1,6 +1,6 @@
-import React, { useState } from "react";
-import { VGrid } from "./VGrid";
-import AutoSizer from "react-virtualized-auto-sizer";
+import React, { useState } from 'react';
+import { VGrid } from './VGrid';
+import { InitialHashProvider } from './InitialHashContext';
 
 function range(n: number = 0) {
   const arr: number[] = [];
@@ -25,7 +25,7 @@ const data = {
 const ListItem = ({ item }: { item: { name: string; }}) => {
   const [clicked, updateClicked] = useState(false);
   return (
-    <div className="boxCell" onClick={() => updateClicked(true)}>
+    <div className='boxCell' onClick={() => updateClicked(true)}>
       <div>
         {item.name}
       </div>
@@ -38,9 +38,26 @@ const ListItem = ({ item }: { item: { name: string; }}) => {
 
 const keyFn = (item: { name: string }) => item.name;
 
+const gridOption = [
+  {
+    media: 'all',
+    gridGap: 16,
+  },
+  {
+    media: 'screen and (min-width: 500px)',
+    gridGap: 32,
+    minContentLength: 360,
+  },
+  {
+    media: 'screen and (min-width: 960px)',
+    gridGap: 32,
+    minContentLength: 420,
+  },
+];
+
 export const App = () => {
   return (
-    <>
+    <InitialHashProvider>
       <h1>Report detail</h1>
 
       <nav>
@@ -51,38 +68,33 @@ export const App = () => {
 
       <h2>Changed</h2>
       <VGrid
-        rowGap={40}
         cellHeight={160}
         items={data.failed}
         keyFn={keyFn}
-        renderItem={({ item }) => (
-          <ListItem key={item.name} item={item} />
-        )}
-      />
+        gridOptions={gridOption}
+      >
+        {({ item }) => <ListItem item={item} />}
+      </VGrid>
 
       <h2>New</h2>
       <VGrid
-        rowGap={40}
         cellHeight={160}
         items={data.newItems}
         keyFn={keyFn}
-        renderItem={({ item }) => (
-          <ListItem key={item.name} item={item} />
-        )}
-      />
+        gridOptions={gridOption}
+      >
+        {({ item }) => <ListItem item={item} />}
+      </VGrid>
 
       <h2>Passed</h2>
       <VGrid
-        rowGap={40}
         cellHeight={160}
         items={data.passed}
         keyFn={keyFn}
-        renderItem={({ item }) => (
-          <ListItem key={item.name} item={item} />
-        )}
-      />
-    </>
+        gridOptions={gridOption}
+      >
+        {({ item }) => <ListItem item={item} />}
+      </VGrid>
+    </InitialHashProvider>
   )
 };
-
-

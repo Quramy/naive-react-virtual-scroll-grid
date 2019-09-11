@@ -8,12 +8,6 @@ body {
   padding: 0 32px;
 }
 
-.cellGrid {
-  display: grid;
-  grid-gap: 40px;
-  grid-template-columns: repeat(auto-fill,minmax(360px,1fr));
-}
-
 .boxCell {
   width: 100%;
   height: 160px;
