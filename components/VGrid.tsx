@@ -1,11 +1,12 @@
 import React from "react";
 import { animateScroll } from "react-scroll";
+import { ResizeObserver } from "@juggle/resize-observer"
 
 type Props<T> = {
   items: T[];
+  keyFn: (item: T) => string;
   renderItem: (props: { item: T }) => any;
   rowGap: number;
-  containerWidth: number;
   cellHeight: number;
 };
 
@@ -19,11 +20,10 @@ type State = {
 
 let hashConsumed = false;
 
-export class VGrid<T extends { name: string; } = { name: string; }> extends React.Component<Props<T>, State> {
+export class VGrid<T> extends React.Component<Props<T>, State> {
 
   containerRef = React.createRef<HTMLDivElement>();
   firstRenderUlRef = React.createRef<HTMLUListElement>();
-  previousMarkerOffsetTop?: number;
 
   state: State = {
     isIntersecting: false,
@@ -33,7 +33,9 @@ export class VGrid<T extends { name: string; } = { name: string; }> extends Reac
     visibleItemsCount: 20,
   };
 
-  observer?: IntersectionObserver;
+  intersectionObserver?: IntersectionObserver;
+  resizeObserver?: ResizeObserver;
+  previousContainerWidth?: number;
 
   constructor(props: Props<T>) {
     super(props);
@@ -41,18 +43,10 @@ export class VGrid<T extends { name: string; } = { name: string; }> extends Reac
     this.handleOnHashChange = this.handleOnHashChange.bind(this);
   }
 
-  UNSAFE_componentWillReceiveProps(next: Props<T>) {
-    console.log(next.containerWidth);
-    const nextCountCellsInColumn = this.countCellsInColumn();
-    if (nextCountCellsInColumn !== this.state.cellCountPerColumn) {
-      this.updateContainerState();
-    }
-  }
-
   componentDidMount() {
     const containerElement = this.containerRef.current;
     if (!containerElement) return;
-    this.observer = new IntersectionObserver(entries => {
+    this.intersectionObserver = new IntersectionObserver(entries => {
       if (entries.length !== 1) return;
       const entry = entries[0];
       const { isIntersecting } = entry;
@@ -60,26 +54,36 @@ export class VGrid<T extends { name: string; } = { name: string; }> extends Reac
     }, {
       threshold: 0,
     });
-    this.observer.observe(containerElement);
+    this.intersectionObserver.observe(containerElement);
+    this.resizeObserver = new ResizeObserver(entries => {
+      if (entries.length !== 1) return;
+      const entry = entries[0];
+      const { contentRect: { width } } = entry;
+      if (this.previousContainerWidth !== width) {
+        this.updateContainerState(width);
+      }
+      this.previousContainerWidth = width;
+    });
+    this.resizeObserver.observe(containerElement);
     document.addEventListener("scroll", this.handleOnScroll);
-    addEventListener("hashchange", this.handleOnHashChange);
+    window.addEventListener("hashchange", this.handleOnHashChange);
 
-    this.updateContainerState();
+    this.previousContainerWidth = containerElement.clientWidth;
+    this.updateContainerState(containerElement.clientWidth);
   }
 
   componentWillUnmount() {
     document.removeEventListener("scroll", this.handleOnScroll);
     window.removeEventListener("hashchange", this.handleOnHashChange);
-    if (this.observer) {
-      this.observer.disconnect();
-    }
+    this.intersectionObserver && this.intersectionObserver.disconnect();
+    this.resizeObserver && this.resizeObserver.disconnect();
   }
 
-  private updateContainerState() {
+  private updateContainerState(containerWidth: number) {
     const { rowGap, cellHeight } = this.props;
     const rowHeight = cellHeight + rowGap;
     const allItemsCount = this.props.items.length;
-    const cellCountPerColumn = this.countCellsInColumn();
+    const cellCountPerColumn = this.countCellsInColumn(containerWidth);
     const containerHeight = Math.ceil(allItemsCount / cellCountPerColumn) * rowHeight - rowGap;
 
     this.setState({ containerHeight, cellCountPerColumn });
@@ -100,16 +104,17 @@ export class VGrid<T extends { name: string; } = { name: string; }> extends Reac
     requestAnimationFrame(() => this.updateCurrentOffset());
   }
 
-  private countCellsInColumn() {
-    const { containerWidth, rowGap } = this.props;
+  private countCellsInColumn(containerWidth: number) {
+    const { rowGap } = this.props;
     // TODO
     if (containerWidth >= 760) return ~~((containerWidth + rowGap) / (360 + rowGap));
     return 1;
   }
 
   private calculatePositionFromHash(hash: string) {
+    const { keyFn } = this.props;
     const targetName = hash.slice(1);
-    const foundIndex = this.props.items.findIndex(({ name }) => name === targetName);
+    const foundIndex = this.props.items.findIndex(item => keyFn(item) === targetName);
     if (foundIndex === -1) return;
     return {
       offset: foundIndex,
@@ -160,7 +165,7 @@ export class VGrid<T extends { name: string; } = { name: string; }> extends Reac
   }
 
   render() {
-    const { items, renderItem } = this.props;
+    const { renderItem, keyFn } = this.props;
     const { containerHeight } = this.state;
     const top = this.calculateVScrollGridTop(this.state.offset);
     return (
@@ -168,7 +173,7 @@ export class VGrid<T extends { name: string; } = { name: string; }> extends Reac
         <ul style={{ position: "absolute", left: 0, right: 0, top }} className="cellGrid">
           {this.createVisibleItems().map(item => {
             return (
-              <li key={item.name}>
+              <li key={keyFn(item)}>
                 {renderItem({ item })}
               </li>
             );

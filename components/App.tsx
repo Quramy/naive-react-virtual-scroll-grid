@@ -36,54 +36,52 @@ const ListItem = ({ item }: { item: { name: string; }}) => {
   );
 };
 
+const keyFn = (item: { name: string }) => item.name;
+
 export const App = () => {
   return (
-    <AutoSizer style={{ width: '100%', height: '100vh' }}>
-      {({ width }) => (
-        <>
-          <h1>Report detail</h1>
+    <>
+      <h1>Report detail</h1>
 
-          <nav>
-            {data.passed.slice(0, 100).map(item => (
-              <a key={item.name} href={`#${item.name}`}>{item.name} </a>
-            ))}
-          </nav>
+      <nav>
+        {data.passed.slice(0, 100).map(item => (
+          <a key={item.name} href={`#${item.name}`}>{item.name} </a>
+        ))}
+      </nav>
 
-          <h2>Changed</h2>
-          <VGrid
-            rowGap={40}
-            containerWidth={width}
-            cellHeight={160}
-            items={data.failed}
-            renderItem={({ item }) => (
-              <ListItem key={item.name} item={item} />
-            )}
-          />
+      <h2>Changed</h2>
+      <VGrid
+        rowGap={40}
+        cellHeight={160}
+        items={data.failed}
+        keyFn={keyFn}
+        renderItem={({ item }) => (
+          <ListItem key={item.name} item={item} />
+        )}
+      />
 
-          <h2>New</h2>
-          <VGrid
-            rowGap={40}
-            containerWidth={width}
-            cellHeight={160}
-            items={data.newItems}
-            renderItem={({ item }) => (
-              <ListItem key={item.name} item={item} />
-            )}
-          />
+      <h2>New</h2>
+      <VGrid
+        rowGap={40}
+        cellHeight={160}
+        items={data.newItems}
+        keyFn={keyFn}
+        renderItem={({ item }) => (
+          <ListItem key={item.name} item={item} />
+        )}
+      />
 
-          <h2>Passed</h2>
-          <VGrid
-            rowGap={40}
-            containerWidth={width}
-            cellHeight={160}
-            items={data.passed}
-            renderItem={({ item }) => (
-              <ListItem key={item.name} item={item} />
-            )}
-          />
-        </>
-      )}
-    </AutoSizer>
+      <h2>Passed</h2>
+      <VGrid
+        rowGap={40}
+        cellHeight={160}
+        items={data.passed}
+        keyFn={keyFn}
+        renderItem={({ item }) => (
+          <ListItem key={item.name} item={item} />
+        )}
+      />
+    </>
   )
 };
 
