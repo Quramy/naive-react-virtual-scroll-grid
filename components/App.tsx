@@ -12,12 +12,15 @@ function range(n: number = 0) {
 
 const data = {
   failed: range(3).map(i => ({
+    num: i,
     name: `failed_${i}`,
   })),
   newItems: range(20).map(i => ({
+    num: i,
     name: `new_${i}`,
   })),
   passed: range(1000).map(i => ({
+    num: i,
     name: `passed_${i}`,
   })),
 };
@@ -35,8 +38,6 @@ const ListItem = ({ item }: { item: { name: string; }}) => {
     </div>
   );
 };
-
-const keyFn = (item: { name: string }) => item.name;
 
 const gridOption = [
   {
@@ -68,9 +69,9 @@ export const App = () => {
 
       <h2>Changed</h2>
       <VGrid
-        cellHeight={160}
         items={data.failed}
-        keyFn={keyFn}
+        itemKey="name"
+        cellHeight={160}
         gridOptions={gridOption}
       >
         {({ item }) => <ListItem item={item} />}
@@ -78,9 +79,9 @@ export const App = () => {
 
       <h2>New</h2>
       <VGrid
-        cellHeight={160}
         items={data.newItems}
-        keyFn={keyFn}
+        itemKey="name"
+        cellHeight={160}
         gridOptions={gridOption}
       >
         {({ item }) => <ListItem item={item} />}
@@ -88,9 +89,9 @@ export const App = () => {
 
       <h2>Passed</h2>
       <VGrid
-        cellHeight={160}
         items={data.passed}
-        keyFn={keyFn}
+        itemKey="name"
+        cellHeight={160}
         gridOptions={gridOption}
       >
         {({ item }) => <ListItem item={item} />}
