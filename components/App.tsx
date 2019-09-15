@@ -11,17 +11,17 @@ function range(n: number = 0) {
 }
 
 const data = {
-  failed: range(3).map(i => ({
+  heros: range(2).map(i => ({
     num: i,
-    name: `failed_${i}`,
+    name: `hero_${i}`,
   })),
-  newItems: range(20).map(i => ({
+  features: range(20).map(i => ({
     num: i,
-    name: `new_${i}`,
+    name: `feature_${i}`,
   })),
-  passed: range(1000).map(i => ({
+  products: range(600).map(i => ({
     num: i,
-    name: `passed_${i}`,
+    name: `product_${i}`,
   })),
 };
 
@@ -59,37 +59,37 @@ const gridOption = [
 export const App = () => {
   return (
     <InitialHashProvider>
-      <h1>Report detail</h1>
+      <h1>Naive React Virtual Grid</h1>
 
       <nav>
-        {data.passed.slice(0, 100).map(item => (
-          <a key={item.name} href={`#${item.name}`}>{item.name} </a>
-        ))}
+        <a href="#hero_0">hero</a>
+        <a href="#feature_0">feature</a>
+        <a href="#product_0">product 0</a>
+        <a href="#product_99">product 99</a>
       </nav>
 
-      <h2>Changed</h2>
       <VGrid
-        items={data.failed}
+        items={data.heros}
         itemKey="name"
-        cellHeight={160}
+        cellHeight={380}
         gridOptions={gridOption}
       >
         {({ item }) => <ListItem item={item} />}
       </VGrid>
 
-      <h2>New</h2>
+      <h2>Features</h2>
       <VGrid
-        items={data.newItems}
+        items={data.features}
         itemKey="name"
-        cellHeight={160}
+        cellHeight={240}
         gridOptions={gridOption}
       >
         {({ item }) => <ListItem item={item} />}
       </VGrid>
 
-      <h2>Passed</h2>
+      <h2>All products</h2>
       <VGrid
-        items={data.passed}
+        items={data.products}
         itemKey="name"
         cellHeight={160}
         gridOptions={gridOption}

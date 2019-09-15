@@ -1,6 +1,7 @@
+import { ResizeObserver } from '@juggle/resize-observer'
+
 import React from 'react';
 import { animateScroll } from 'react-scroll';
-import { ResizeObserver } from '@juggle/resize-observer'
 import { InitialHashContext, InitialHashContextValue } from './InitialHashContext';
 
 type GridStyleProperty = {
@@ -25,7 +26,7 @@ type SK<T, K extends keyof T> = T[K] extends string ? K : never;
 type Props<T, K extends keyof T> = {
   items: T[];
   itemKey: SK<T, K>;
-  children: (props: { item: T, index: number }) => JSX.Element;
+  children: (props: { item: T; index: number }) => JSX.Element;
   gridOptions: GridStyleProperty | ({ media: string } & GridStyleProperty)[];
   cellHeight: number;
 };
@@ -151,7 +152,7 @@ export class VGrid<T, K extends keyof T> extends React.Component<Props<T, K>, St
     });
     this.resizeObserver.observe(containerElement);
 
-    document.addEventListener('scroll', this.handleOnScroll);
+    document.addEventListener('scroll', this.handleOnScroll, { passive: true });
 
     // Listen to URL hash and update scrolling position if it's changed.
     window.addEventListener('hashchange', this.handleOnHashChange);
@@ -200,8 +201,7 @@ export class VGrid<T, K extends keyof T> extends React.Component<Props<T, K>, St
     const allItemsCount = this.props.items.length;
     const containerHeight = Math.ceil(allItemsCount / repeatLength) * rowHeight - gridStyle.gridGap;
     const visibleItemsLength =
-      (~~(innerHeight / (this.props.cellHeight + gridStyle.gridGap)) + 2 + prerenderRowsLength) *
-      repeatLength;
+      (~~(innerHeight / (this.props.cellHeight + gridStyle.gridGap)) + 2 + prerenderRowsLength) * repeatLength;
     this.setState({ containerHeight, repeatLength, visibleItemsLength, gridStyle });
 
     requestAnimationFrame(() => this.updateCurrentOffsetIndex());
@@ -224,7 +224,7 @@ export class VGrid<T, K extends keyof T> extends React.Component<Props<T, K>, St
     const { itemKey } = this.props;
     const targetName = hash.slice(1);
     const foundIndex = this.props.items.findIndex((item) => {
-      const key = item[itemKey] as unknown as string;
+      const key = (item[itemKey] as unknown) as string;
       return key === targetName;
     });
     if (foundIndex === -1) return;
@@ -288,7 +288,7 @@ export class VGrid<T, K extends keyof T> extends React.Component<Props<T, K>, St
       <div ref={this.containerRef} style={containerStyle}>
         <ul style={innerStyle}>
           {this.sliceVisibleItems().map((item, index) => (
-            <li key={(item[itemKey] as unknown as string)} style={{ height: cellHeight }}>
+            <li key={(item[itemKey] as unknown) as string} style={{ height: cellHeight }}>
               {children({ item, index })}
             </li>
           ))}
