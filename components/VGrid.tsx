@@ -170,8 +170,7 @@ export class VGrid<T, K extends keyof T> extends React.Component<Props<T, K>, St
       if (hit) {
         // Notify scrolling to the context because we should not check the hash after the scrolling.
         this.context.consume();
-        this.setState({ offsetIndex: hit.offsetIndex });
-        setTimeout(() => scrollTo(0, this.calculateClientOffsetTop(hit.offsetIndex)));
+        setTimeout(() => this.scrollTo(hit.offsetIndex, true));
       }
     }
   }
