@@ -1,8 +1,7 @@
 import { ResizeObserver } from '@juggle/resize-observer'
 
 import React from 'react';
-import { animateScroll } from 'react-scroll';
-import { InitialHashContext, InitialHashContextValue } from './InitialHashContext';
+import { AnchorScrollContext, AnchorScrollContextValue } from '../contexts/AnchorScrollContext';
 
 type GridStyleProperty = {
   gridGap: number;
@@ -27,6 +26,7 @@ type Props<T, K extends keyof T> = {
   items: T[];
   itemKey: SK<T, K>;
   children: (props: { item: T; index: number }) => JSX.Element;
+  dimmerCell?: () => JSX.Element;
   gridOptions: GridStyleProperty | ({ media: string } & GridStyleProperty)[];
   cellHeight: number;
 };
@@ -59,9 +59,9 @@ const createGridStyleObject = (opt: GridStyleProperty) => {
 const prerenderRowsLength = 1;
 
 export class VGrid<T, K extends keyof T> extends React.Component<Props<T, K>, State> {
-  static contextType = InitialHashContext;
+  static contextType = AnchorScrollContext;
 
-  context!: InitialHashContextValue;
+  context!: AnchorScrollContextValue;
   containerRef = React.createRef<HTMLDivElement>();
   intersectionObserver?: IntersectionObserver;
   resizeObserver?: ResizeObserver;
@@ -130,7 +130,9 @@ export class VGrid<T, K extends keyof T> extends React.Component<Props<T, K>, St
         if (entries.length !== 1) return;
         const entry = entries[0];
         const { isIntersecting } = entry;
-        this.setState({ isIntersecting });
+        if (this.state.isIntersecting !== isIntersecting) {
+          this.setState({ isIntersecting });
+        }
       },
       {
         threshold: 0,
@@ -237,12 +239,34 @@ export class VGrid<T, K extends keyof T> extends React.Component<Props<T, K>, St
     const { hash } = new URL(newURL);
     const hit = this.findOffsetIndexFromHash(hash);
     if (!hit) return;
-    animateScroll.scrollTo(this.calculateClientOffsetTop(hit.offsetIndex));
+    this.scrollTo(hit.offsetIndex);
   }
 
   private handleOnScroll() {
     if (!this.state.isIntersecting) return;
     this.updateCurrentOffsetIndex();
+  }
+
+  private scrollTo(offsetIndex: number, instant = false) {
+    const currentTop = scrollY;
+    const top = this.calculateClientOffsetTop(offsetIndex);
+    const threshold = this.state.visibleItemsLength * this.rowHeightUnit * 1;
+    const rafCb = () => {
+      if (Math.abs(currentTop - scrollY) >= threshold) {
+        this.context.isAnchorScrolling = true;
+      }
+      if (Math.abs(top - scrollY) <= threshold) {
+        this.context.isAnchorScrolling = false;
+        this.updateCurrentOffsetIndex();
+        return;
+      }
+      requestAnimationFrame(rafCb);
+    };
+    requestAnimationFrame(rafCb);
+    scroll({
+      top,
+      behavior: instant ? ('instant' as unknown as any) : 'smooth',
+    });
   }
 
   private updateCurrentOffsetIndex() {
@@ -273,7 +297,7 @@ export class VGrid<T, K extends keyof T> extends React.Component<Props<T, K>, St
   }
 
   render() {
-    const { children, itemKey, cellHeight } = this.props;
+    const { children, dimmerCell, itemKey, cellHeight } = this.props;
     const { containerHeight } = this.state;
     const offsetTop = this.calculateInnerOffsetTop(this.state.offsetIndex);
     const containerStyle = {
@@ -287,11 +311,11 @@ export class VGrid<T, K extends keyof T> extends React.Component<Props<T, K>, St
     return (
       <div ref={this.containerRef} style={containerStyle}>
         <ul style={innerStyle}>
-          {this.sliceVisibleItems().map((item, index) => (
+          {(this.sliceVisibleItems().map((item, index) => (
             <li key={(item[itemKey] as unknown) as string} style={{ height: cellHeight }}>
-              {children({ item, index })}
+              {this.context.isAnchorScrolling && dimmerCell ? dimmerCell() : children({ item, index })}
             </li>
-          ))}
+          )))}
         </ul>
       </div>
     );

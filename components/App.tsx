@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { VGrid } from './VGrid';
-import { InitialHashProvider } from './InitialHashContext';
+import { AnchorScrollProvider } from '../contexts/AnchorScrollContext';
 
 function range(n: number = 0) {
   const arr: number[] = [];
@@ -19,7 +19,7 @@ const data = {
     num: i,
     name: `feature_${i}`,
   })),
-  products: range(600).map(i => ({
+  products: range(200).map(i => ({
     num: i,
     name: `product_${i}`,
   })),
@@ -38,6 +38,14 @@ const ListItem = ({ item }: { item: { name: string; }}) => {
     </div>
   );
 };
+
+const Dimmer = () => (
+  <div className="dimmerCell">
+    <div>
+      Dimmer!
+    </div>
+  </div>
+);
 
 const gridOption = [
   {
@@ -58,7 +66,7 @@ const gridOption = [
 
 export const App = () => {
   return (
-    <InitialHashProvider>
+    <AnchorScrollProvider>
       <h1>Naive React Virtual Grid</h1>
 
       <nav>
@@ -73,6 +81,7 @@ export const App = () => {
         itemKey="name"
         cellHeight={380}
         gridOptions={gridOption}
+        dimmerCell={Dimmer}
       >
         {({ item }) => <ListItem item={item} />}
       </VGrid>
@@ -83,6 +92,7 @@ export const App = () => {
         itemKey="name"
         cellHeight={240}
         gridOptions={gridOption}
+        dimmerCell={Dimmer}
       >
         {({ item }) => <ListItem item={item} />}
       </VGrid>
@@ -93,9 +103,10 @@ export const App = () => {
         itemKey="name"
         cellHeight={160}
         gridOptions={gridOption}
+        dimmerCell={Dimmer}
       >
         {({ item }) => <ListItem item={item} />}
       </VGrid>
-    </InitialHashProvider>
+    </AnchorScrollProvider>
   )
 };

@@ -8,7 +8,20 @@
 body {
   font-family: sans-serif;
   color: #28273e;
-  padding: 0 32px;
+  padding: 0 16px;
+}
+
+@media screen and (min-width: 500px) {
+  body {
+    padding: 0 32px;
+  }
+}
+
+.dimmerCell {
+  width: 100%;
+  padding: 16px;
+  height: 100%;
+  background-color: #ddd;
 }
 
 .boxCell {
